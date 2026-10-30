@@ -1,0 +1,31 @@
+html,
+body {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+  font-family: system-ui, sans-serif;
+}
+
+#controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem;
+}
+
+#clock {
+  font-variant-numeric: tabular-nums;
+}
+
+#time {
+  flex: 1 1 12rem;
+}
+
+#map {
+  flex: 1;
+}

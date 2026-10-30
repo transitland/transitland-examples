@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Vehicle timelapse</title>
+  </head>
+  <body>
+    <div id="controls">
+      <input id="date" type="date" aria-label="Service date">
+      <button id="load" type="button">Load this view</button>
+      <button id="play" type="button">Play</button>
+      <select id="speed" aria-label="Playback speed">
+        <option value="60">60×</option>
+        <option value="300" selected>300×</option>
+        <option value="900">900×</option>
+      </select>
+      <select id="trail" aria-label="Trail length">
+        <option value="0">No trail</option>
+        <option value="2">2 min trail</option>
+        <option value="5" selected>5 min trail</option>
+        <option value="10">10 min trail</option>
+        <option value="20">20 min trail</option>
+        <option value="30">30 min trail</option>
+        <option value="60">60 min trail</option>
+      </select>
+      <select id="width" aria-label="Trail width">
+        <option value="2">2 px trail</option>
+        <option value="3">3 px trail</option>
+        <option value="4">4 px trail</option>
+        <option value="6" selected>6 px trail</option>
+        <option value="8">8 px trail</option>
+        <option value="12">12 px trail</option>
+        <option value="16">16 px trail</option>
+      </select>
+      <span id="clock"></span>
+      <input id="time" type="range" min="0" max="86400" step="60" aria-label="Time of day">
+      <span id="status"></span>
+    </div>
+    <div id="map"></div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
