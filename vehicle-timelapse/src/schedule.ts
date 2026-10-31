@@ -20,79 +20,6 @@ export interface Run {
   distances: number[]
 }
 
-// The signed integers in an encoded polyline string, in order, with null for
-// each '.', which a timetable grid writes where a value is missing.
-function decodeIntegers (s: string): (number | null)[] {
-  const values: (number | null)[] = []
-  for (let k = 0; k < s.length;) {
-    if (s[k] === '.') {
-      values.push(null)
-      k++
-      continue
-    }
-    let result = 0
-    let shift = 0
-    let b: number
-    do {
-      b = s.charCodeAt(k++) - 63
-      result |= (b & 0x1F) << shift
-      shift += 5
-    } while (b >= 0x20)
-    values.push(result & 1 ? ~(result >> 1) : result >> 1)
-  }
-  return values
-}
-
-// A shape's points from an encoded polyline at five digits of precision, which
-// holds each point as its latitude and longitude less the previous point's.
-export function decodePolyline (s: string): [number, number][] {
-  const values = decodeIntegers(s)
-  const coords: [number, number][] = []
-  let lat = 0
-  let lon = 0
-  for (let i = 0; i + 1 < values.length; i += 2) {
-    lat += values[i] ?? 0
-    lon += values[i + 1] ?? 0
-    coords.push([lon / 1e5, lat / 1e5])
-  }
-  return coords
-}
-
-// A timetable grid from its encoded rows: row i is a stop and column j a trip,
-// with null where the feed gives no value.
-//
-// Within a row, each value is encoded as its difference from the one before.
-// Down a column, each value after the trip's first is encoded as its difference
-// from that first value.
-export function decodeGrid (rows: string[]): (number | null)[][] {
-  const grid = rows.map((row) => {
-    let prev = 0
-    return decodeIntegers(row).map((v) => {
-      if (v === null) {
-        return null
-      }
-      prev += v
-      return prev
-    })
-  })
-  const width = grid[0]?.length ?? 0
-  for (let j = 0; j < width; j++) {
-    let first: number | null = null
-    for (const row of grid) {
-      const v = row[j]
-      if (v == null) {
-        continue
-      }
-      if (first === null) {
-        first = v
-      } else {
-        row[j] = first + v
-      }
-    }
-  }
-  return grid
-}
-
 // A GTFS time, HH:MM:SS, in seconds. Hours run past 24 for a trip that runs past
 // midnight.
 function parseTime (s: string): number {
@@ -103,9 +30,10 @@ function parseTime (s: string): number {
 // Every run a stop pattern's trips make on the day. A trip without a shape makes
 // none, since its vehicle would have no path.
 export function timetableRuns (timetable: Timetable, routeId: number): Run[] {
-  const arrivals = decodeGrid(timetable.arrival_times.polyline)
-  const departures = decodeGrid(timetable.departure_times.polyline)
-  const distances = decodeGrid(timetable.shape_distances.polyline)
+  const seconds = (grid: (string | null)[][]) => grid.map(row => row.map(t => t === null ? null : parseTime(t)))
+  const arrivals = seconds(timetable.arrival_times.values)
+  const departures = seconds(timetable.departure_times.values)
+  const distances = timetable.shape_distances.values
   const runs: Run[] = []
   timetable.trips.forEach((trip, j) => {
     const shapeId = trip.shape?.id

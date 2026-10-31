@@ -3,13 +3,18 @@ import 'maplibre-gl/dist/maplibre-gl.css'
 import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'
 import './style.css'
 import { fetchPatterns, fetchRoutes, type Route } from './api'
-import { decodePolyline, timetableRuns, vehiclePosition, type Run, type Shape } from './schedule'
+import { timetableRuns, vehiclePosition, type Run, type Shape } from './schedule'
 import { TrailLayer } from './trail-layer'
 import { buildTrailSegments } from './trails'
 
 // Loading a view costs one request for its routes and one more per route, so a
-// view with more routes than this is refused. Raise it to load bigger areas.
-const MAX_ROUTES = 50
+// view with more routes than this is refused. Set VITE_MAX_ROUTES in the shell
+// to load bigger areas, up to 999, since the routes request returns at most 1,000.
+//
+// Vite passes the app only the shell variables whose names start with VITE_,
+// which keeps your key in the dev server.
+const maxRoutesSetting: string = import.meta.env.VITE_MAX_ROUTES ?? '50'
+const MAX_ROUTES = Number(maxRoutesSetting)
 // Pattern requests in flight at once.
 const PARALLEL_REQUESTS = 6
 // The map opens on Santa Cruz, California, which has about two dozen routes.
@@ -26,6 +31,8 @@ const playButton = document.getElementById('play') as HTMLButtonElement
 const speedSelect = document.getElementById('speed') as HTMLSelectElement
 const trailSelect = document.getElementById('trail') as HTMLSelectElement
 const widthSelect = document.getElementById('width') as HTMLSelectElement
+const routesCheckbox = document.getElementById('show-routes') as HTMLInputElement
+const basemapCheckbox = document.getElementById('show-basemap') as HTMLInputElement
 const clock = document.getElementById('clock') as HTMLSpanElement
 const timeSlider = document.getElementById('time') as HTMLInputElement
 const statusText = document.getElementById('status') as HTMLSpanElement
@@ -91,8 +98,30 @@ map.on('load', () => {
 
   // The vehicles' trails, under the vehicles.
   map.addLayer(trailLayer, 'vehicles')
+
+  // The checkboxes act on layers, which exist from here on.
+  showLayers()
+  for (const checkbox of [routesCheckbox, basemapCheckbox]) {
+    checkbox.addEventListener('change', () => {
+      showLayers()
+    })
+  }
   draw()
 })
+
+// The layers the app adds. Every other layer belongs to the basemap.
+const APP_LAYERS = ['routes', 'trails', 'vehicles']
+
+// Shows or hides the route lines and the basemap, as their checkboxes say.
+function showLayers () {
+  const visibility = (on: boolean) => on ? 'visible' : 'none'
+  map.setLayoutProperty('routes', 'visibility', visibility(routesCheckbox.checked))
+  for (const id of map.getLayersOrder()) {
+    if (!APP_LAYERS.includes(id)) {
+      map.setLayoutProperty(id, 'visibility', visibility(basemapCheckbox.checked))
+    }
+  }
+}
 
 // Trails drop their points closer together than the trail is wide, which
 // depends on the zoom.
@@ -122,6 +151,10 @@ function routeColor (route: Route): string {
 // The runs on every route with a stop in the map's view, a route per request, so
 // the vehicles appear as their routes arrive.
 async function load () {
+  if (!Number.isInteger(MAX_ROUTES) || MAX_ROUTES < 1 || MAX_ROUTES > 999) {
+    statusText.textContent = `VITE_MAX_ROUTES must be a whole number from 1 to 999, not "${maxRoutesSetting}".`
+    return
+  }
   const n = ++loadCount
   const date = dateInput.value
   runs = []
@@ -142,7 +175,7 @@ async function load () {
   }
   const routes = found.data
   if (routes.length > MAX_ROUTES) {
-    statusText.textContent = `More than ${MAX_ROUTES} routes in view, each a request to load. Zoom in, or raise MAX_ROUTES in src/main.ts.`
+    statusText.textContent = `More than ${MAX_ROUTES} routes in view, each a request to load. Zoom in, or set VITE_MAX_ROUTES higher.`
     return
   }
   if (routes.length === 0) {
@@ -172,8 +205,10 @@ async function load () {
       }
       for (const pattern of res.data) {
         for (const s of pattern.shapes) {
-          if (s.polyline && s.distances && !shapes.has(s.id)) {
-            shapes.set(s.id, { coords: decodePolyline(s.polyline), distances: s.distances })
+          if (s.distances && !shapes.has(s.id)) {
+            // Each coordinate's third value is a measure the app doesn't use.
+            const coords = s.geometry.coordinates.map(([lon, lat]): [number, number] => [lon, lat])
+            shapes.set(s.id, { coords, distances: s.distances })
           }
         }
         if (pattern.timetable) {

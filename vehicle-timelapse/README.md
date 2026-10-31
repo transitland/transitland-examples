@@ -26,24 +26,30 @@ The app sends its requests to Vite's dev server, which forwards them to Transitl
 
 Each load makes one request for the routes in view, then one request per route. Each REST request counts against your plan's monthly allowance. The opening view of Santa Cruz has about two dozen routes, so loading it costs about 25 requests.
 
-A view with more than 50 routes is refused, so that a load can't use up your allowance by accident. To load bigger areas, raise `MAX_ROUTES` in [src/main.ts](src/main.ts).
+A view with more than 50 routes is refused, so that a load can't use up your allowance by accident. To load bigger areas, set `VITE_MAX_ROUTES`, up to 999:
+
+```sh
+VITE_MAX_ROUTES=200 TRANSITLAND_API_KEY=your-key pnpm dev
+```
+
+Vite passes the app only the variables whose names start with `VITE_`, which is why this one has a different prefix from your key. The key stays in the dev server.
 
 Vector tile requests don't count against the REST allowance. Plans include tiles under fair use.
 
 ## How it works
 
 1. `GET /api/v2/rest/routes?bbox=west,south,east,north` returns the routes with a stop in view, with their colors.
-2. For each route, `GET /api/v2/rest/routes/{id}/patterns?service_date=YYYY-MM-DD&include_timetable=true&include_shapes=true&encoding=polyline` returns the route's stop patterns that run on the date. Each pattern has a timetable and the shapes its trips follow.
-   - A timetable's grids hold arrival times, departure times, and distances along the shape: a row per stop and a value per trip, written as encoded polylines.
-   - Each shape comes as an encoded polyline, with the distance along it at each point.
-3. [src/schedule.ts](src/schedule.ts) decodes the grids and polylines, and turns each trip into a run: the times its vehicle reaches each stop, and how far along its shape each stop is. A frequency-based trip makes a run for each start its frequencies give.
+2. For each route, `GET /api/v2/rest/routes/{id}/patterns?service_date=YYYY-MM-DD&include_timetable=true&include_shapes=true` returns the route's stop patterns that run on the date. Each pattern has a timetable and the shapes its trips follow.
+   - A timetable's grids hold arrival times, departure times, and distances along the shape, with a row per stop and a value per trip.
+   - Each shape comes as a GeoJSON LineString, with the distance along it at each point.
+3. [src/schedule.ts](src/schedule.ts) turns each trip into a run: the times its vehicle reaches each stop, and how far along its shape each stop is. A frequency-based trip makes a run for each start its frequencies give.
 4. On each animation frame, [src/main.ts](src/main.ts) finds where each run's vehicle is. It works out how far along its shape the vehicle has driven at that time, then finds the point on the shape that distance along. The vehicles are drawn as a GeoJSON source on a MapLibre map.
 5. On the same frame, [src/trails.ts](src/trails.ts) collects the stretch of shape each vehicle drove during the trail's length, with the time it passed each point. [src/trail-layer.ts](src/trail-layer.ts) draws those stretches as a MapLibre custom layer in WebGL, and fades each point by how long ago the vehicle passed it.
 
 The files:
 
 - [src/api.ts](src/api.ts): the two REST requests, and the parts of their responses the app reads.
-- [src/schedule.ts](src/schedule.ts): decoding, and the vehicles' positions.
+- [src/schedule.ts](src/schedule.ts): runs from the timetables, and the vehicles' positions.
 - [src/trails.ts](src/trails.ts): the stretches each vehicle drove, as segments for the trail layer.
 - [src/trail-layer.ts](src/trail-layer.ts): the WebGL layer that draws and fades the trails.
 - [src/main.ts](src/main.ts): the map, loading, playback, and each route's color.
@@ -53,6 +59,7 @@ The files:
 
 - **Trips past midnight.** A trip that leaves at 11:30 pm belongs to that day's service, so its vehicle is still running after midnight of the next calendar day. This app loads one service date, so the early morning misses those vehicles. Load the day before as well, and shift its times back by a day.
 - **Other colors.** Vehicles and trails take their route's `route_color` from `routeColor` in [src/main.ts](src/main.ts), with gray for a route that has none. Color them by route type, agency, or how often the route runs instead. The routes request returns more than the app reads, so add the fields you need to `Route` in [src/api.ts](src/api.ts).
+- **Smaller responses.** With `encoding=polyline`, the patterns request sends each timetable grid row and each shape as an encoded polyline, about a third the size of the plain arrays. The endpoint's response schema in the [REST API reference](https://www.transit.land/documentation/rest-api) describes how the grids are encoded.
 
 ## Another server
 

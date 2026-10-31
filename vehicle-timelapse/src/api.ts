@@ -9,9 +9,9 @@ export interface Route {
   route_color: string | null
 }
 
-// One stop pattern's timetable, from /rest/routes/{route_key}/patterns with
-// encoding=polyline. Each grid holds an encoded row per stop of the pattern,
-// with a value per trip in the order of `trips` (see decodeGrid in schedule.ts).
+// One stop pattern's timetable, from /rest/routes/{route_key}/patterns. Each
+// grid has a row per stop of the pattern, with a value per trip in the order of
+// `trips`, or null where the feed gives none.
 export interface Timetable {
   trips: {
     id: number
@@ -20,19 +20,24 @@ export interface Timetable {
     // vehicle runs again at each headway.
     frequencies: { start_time: string, end_time: string, headway_secs: number }[] | null
   }[]
-  arrival_times: { polyline: string[] }
-  departure_times: { polyline: string[] }
+  // Times as HH:MM:SS, with hours past 24 for a trip that runs past midnight.
+  arrival_times: { values: (string | null)[][] }
+  departure_times: { values: (string | null)[][] }
   // Meters along the trip's shape at each stop.
-  shape_distances: { polyline: string[] }
+  shape_distances: { values: (number | null)[][] }
 }
 
 // A stop pattern: a sequence of stops a route's trips serve, with the trips that
 // serve it on the requested date.
 export interface Pattern {
   timetable: Timetable | null
-  // The shapes the pattern's trips follow, each with the distance along it at
-  // each of its points, in meters.
-  shapes: { id: number, polyline: string | null, distances: number[] | null }[]
+  // The shapes the pattern's trips follow. A shape's geometry is a GeoJSON
+  // LineString, and `distances` holds the meters along it at each point.
+  shapes: {
+    id: number
+    geometry: { coordinates: [number, number, number][] }
+    distances: number[] | null
+  }[]
 }
 
 // A response's data, or what went wrong.
@@ -75,8 +80,7 @@ export async function fetchPatterns (routeId: number, date: string): Promise<Res
   const res = await get<{ routes: { patterns: Pattern[] | null }[] }>(`/rest/routes/${routeId}/patterns`, {
     service_date: date,
     include_timetable: 'true',
-    include_shapes: 'true',
-    encoding: 'polyline'
+    include_shapes: 'true'
   })
   // A route with no trips on the date has no patterns.
   return 'error' in res ? res : { data: res.data.routes.flatMap(r => r.patterns ?? []) }
