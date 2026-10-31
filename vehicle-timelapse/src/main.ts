@@ -13,7 +13,7 @@ import { buildTrailSegments } from './trails'
 //
 // Vite passes the app only the shell variables whose names start with VITE_,
 // which keeps your key in the dev server.
-const maxRoutesSetting: string = import.meta.env.VITE_MAX_ROUTES ?? '50'
+const maxRoutesSetting: string = import.meta.env.VITE_MAX_ROUTES ?? '100'
 const MAX_ROUTES = Number(maxRoutesSetting)
 // Pattern requests in flight at once.
 const PARALLEL_REQUESTS = 6

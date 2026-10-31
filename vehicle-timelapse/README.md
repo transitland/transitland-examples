@@ -26,7 +26,7 @@ The app sends its requests to Vite's dev server, which forwards them to Transitl
 
 Each load makes one request for the routes in view, then one request per route. Each REST request counts against your plan's monthly allowance. The opening view of Santa Cruz has about two dozen routes, so loading it costs about 25 requests.
 
-A view with more than 50 routes is refused, so that a load can't use up your allowance by accident. To load bigger areas, set `VITE_MAX_ROUTES`, up to 999:
+A view with more than 100 routes is refused, so that a load can't use up your allowance by accident. To load bigger areas, set `VITE_MAX_ROUTES`, up to 999:
 
 ```sh
 VITE_MAX_ROUTES=200 TRANSITLAND_API_KEY=your-key pnpm dev
