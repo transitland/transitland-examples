@@ -5,6 +5,9 @@
 // A route, as /rest/routes returns it.
 export interface Route {
   id: number
+  // The route's GTFS route type, as one of the basic types: 3, a bus, for an
+  // extended type such as 700.
+  route_type_basic: number
   // Six hex digits, without a '#', or empty when the feed gives none.
   route_color: string | null
 }

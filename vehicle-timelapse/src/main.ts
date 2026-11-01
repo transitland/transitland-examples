@@ -3,6 +3,7 @@ import 'maplibre-gl/dist/maplibre-gl.css'
 import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'
 import './style.css'
 import { fetchPatterns, fetchRoutes, type Route } from './api'
+import { NO_ROUTE_COLOR, routeColor, type ColorMode } from './colors'
 import { timetableRuns, vehiclePosition, type Run, type Shape } from './schedule'
 import { TrailLayer } from './trail-layer'
 import { buildTrailSegments } from './trails'
@@ -20,8 +21,6 @@ const PARALLEL_REQUESTS = 6
 // The map opens on Santa Cruz, California, which has about two dozen routes.
 const START_BOUNDS: [number, number, number, number] = [-122.08, 36.95, -121.98, 37.0]
 const SECONDS_PER_DAY = 86400
-// For a route without a route_color.
-const NO_ROUTE_COLOR = '#888888'
 // MapLibre's world at zoom 0, in CSS pixels: one 512 pixel tile.
 const WORLD_PIXELS = 512
 
@@ -31,6 +30,8 @@ const playButton = document.getElementById('play') as HTMLButtonElement
 const speedSelect = document.getElementById('speed') as HTMLSelectElement
 const trailSelect = document.getElementById('trail') as HTMLSelectElement
 const widthSelect = document.getElementById('width') as HTMLSelectElement
+const colorSelect = document.getElementById('color') as HTMLSelectElement
+const headsCheckbox = document.getElementById('show-heads') as HTMLInputElement
 const routesCheckbox = document.getElementById('show-routes') as HTMLInputElement
 const basemapCheckbox = document.getElementById('show-basemap') as HTMLInputElement
 const clock = document.getElementById('clock') as HTMLSpanElement
@@ -82,7 +83,7 @@ map.on('load', () => {
     }
   })
 
-  // The vehicles, as dots in their routes' colors, redrawn on every frame.
+  // The vehicles, as dots at the heads of their trails, redrawn on every frame.
   map.addSource('vehicles', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } })
   map.addLayer({
     id: 'vehicles',
@@ -101,7 +102,7 @@ map.on('load', () => {
 
   // The checkboxes act on layers, which exist from here on.
   showLayers()
-  for (const checkbox of [routesCheckbox, basemapCheckbox]) {
+  for (const checkbox of [headsCheckbox, routesCheckbox, basemapCheckbox]) {
     checkbox.addEventListener('change', () => {
       showLayers()
     })
@@ -112,9 +113,11 @@ map.on('load', () => {
 // The layers the app adds. Every other layer belongs to the basemap.
 const APP_LAYERS = ['routes', 'trails', 'vehicles']
 
-// Shows or hides the route lines and the basemap, as their checkboxes say.
+// Shows or hides the vehicles, the route lines and the basemap, as their
+// checkboxes say.
 function showLayers () {
   const visibility = (on: boolean) => on ? 'visible' : 'none'
+  map.setLayoutProperty('vehicles', 'visibility', visibility(headsCheckbox.checked))
   map.setLayoutProperty('routes', 'visibility', visibility(routesCheckbox.checked))
   for (const id of map.getLayersOrder()) {
     if (!APP_LAYERS.includes(id)) {
@@ -133,19 +136,21 @@ map.on('zoomend', () => {
 // Loading
 /////////////////
 
-// What the loaded view holds: every run its routes make on the date, the shapes
-// the runs follow, and each route's color.
+// What the loaded view holds: its routes, every run they make on the date, and
+// the shapes the runs follow.
+let loadedRoutes: Route[] = []
 let runs: Run[] = []
 let shapes = new Map<number, Shape>()
+// Each route's color, in the color mode chosen.
 let routeColors = new Map<number, string>()
 
 // Each load's number. A load that finds a newer one started stops, so a slow
 // one cannot add its routes to the next one's.
 let loadCount = 0
 
-function routeColor (route: Route): string {
-  const hex = (route.route_color ?? '').replace(/^#/, '')
-  return /^[0-9a-f]{6}$/i.test(hex) ? `#${hex}` : NO_ROUTE_COLOR
+function colorRoutes () {
+  const mode = colorSelect.value as ColorMode
+  routeColors = new Map(loadedRoutes.map(r => [r.id, routeColor(r, mode)]))
 }
 
 // The runs on every route with a stop in the map's view, a route per request, so
@@ -157,6 +162,7 @@ async function load () {
   }
   const n = ++loadCount
   const date = dateInput.value
+  loadedRoutes = []
   runs = []
   shapes = new Map()
   routeColors = new Map()
@@ -182,9 +188,8 @@ async function load () {
     statusText.textContent = 'No routes stop in this view.'
     return
   }
-  for (const route of routes) {
-    routeColors.set(route.id, routeColor(route))
-  }
+  loadedRoutes = routes
+  colorRoutes()
 
   let done = 0
   let next = 0
@@ -317,5 +322,10 @@ for (const select of [trailSelect, widthSelect]) {
     draw()
   })
 }
+
+colorSelect.addEventListener('change', () => {
+  colorRoutes()
+  draw()
+})
 
 draw()

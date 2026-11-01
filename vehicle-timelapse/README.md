@@ -1,6 +1,6 @@
 # Vehicle timelapse
 
-Every scheduled vehicle on the routes in a map view, moving through one service day. Each vehicle follows its trip's shape, reaches each stop at its scheduled time, and leaves a trail in its route's color that fades behind it. The positions come from static GTFS schedules alone, with no realtime data.
+Every scheduled vehicle on the routes in a map view, moving through one service day. Each vehicle follows its trip's shape, reaches each stop at its scheduled time, and leaves a trail that fades behind it, in its route's own color or a color for its route type. The positions come from static GTFS schedules alone, with no realtime data.
 
 The app uses two Transitland APIs:
 
@@ -52,13 +52,14 @@ The files:
 - [src/schedule.ts](src/schedule.ts): runs from the timetables, and the vehicles' positions.
 - [src/trails.ts](src/trails.ts): the stretches each vehicle drove, as segments for the trail layer.
 - [src/trail-layer.ts](src/trail-layer.ts): the WebGL layer that draws and fades the trails.
-- [src/main.ts](src/main.ts): the map, loading, playback, and each route's color.
+- [src/colors.ts](src/colors.ts): each route's color, from its `route_color` or its route type.
+- [src/main.ts](src/main.ts): the map, loading and playback.
 - [vite.config.ts](vite.config.ts): the dev server, which adds your key.
 
 ## Things to try
 
 - **Trips past midnight.** A trip that leaves at 11:30 pm belongs to that day's service, so its vehicle is still running after midnight of the next calendar day. This app loads one service date, so the early morning misses those vehicles. Load the day before as well, and shift its times back by a day.
-- **Other colors.** Vehicles and trails take their route's `route_color` from `routeColor` in [src/main.ts](src/main.ts), with gray for a route that has none. Color them by route type, agency, or how often the route runs instead. The routes request returns more than the app reads, so add the fields you need to `Route` in [src/api.ts](src/api.ts).
+- **Other colors.** Vehicles and trails take their colors from `routeColor` in [src/colors.ts](src/colors.ts): the route's `route_color`, or a color for its route type from the Tableau 10 colormap, with gray for a route that has neither. Color them by agency, or by how often the route runs, instead. The routes request returns more than the app reads, so add the fields you need to `Route` in [src/api.ts](src/api.ts).
 - **Smaller responses.** With `encoding=polyline`, the patterns request sends each timetable grid row and each shape as an encoded polyline, about a third the size of the plain arrays. The endpoint's response schema in the [REST API reference](https://www.transit.land/documentation/rest-api) describes how the grids are encoded.
 
 ## Another server
